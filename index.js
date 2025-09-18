@@ -41,7 +41,12 @@ app.get('/products/:productSlug/:citySlug', async (req, res) => {
     }
 });
 
+// ======================================================================
+// =================== EFFICIENT SITEMAP LOGIC ==========================
+// ======================================================================
+
 // --- ROUTE 1: The Sitemap Index File ---
+// This is a "table of contents" for your other sitemaps. It's very fast.
 app.get('/sitemap.xml', async (req, res) => {
     res.header('Content-Type', 'application/xml');
     try {
@@ -59,6 +64,8 @@ app.get('/sitemap.xml', async (req, res) => {
 });
 
 // --- ROUTE 2: Dynamic Sitemaps for Each Product ---
+// This creates a smaller sitemap for each product (e.g., /sitemaps/cpp-film.xml).
+// Because each file is small, it generates quickly and avoids the timeout.
 app.get('/sitemaps/:productSlug.xml', async (req, res) => {
     res.header('Content-Type', 'application/xml');
     const { productSlug } = req.params;
@@ -82,3 +89,28 @@ app.get('/sitemaps/:productSlug.xml', async (req, res) => {
 
 // --- Export the app for Vercel ---
 module.exports = app;
+```eof
+
+---
+### ## 2. Deploy and Submit to Google
+
+1.  **Deploy Your Final Changes:** Push the updated `index.js` file to GitHub.
+    ```powershell
+    git add .
+    git commit -m "Implement sitemap index to prevent timeout"
+    git push origin main
+    ```
+2.  **Test It:** Once deployed, test your new sitemap index by visiting:
+    `https://cities.janvipackaging.online/sitemap.xml`
+    You will see a small file listing the URLs for your individual product sitemaps (e.g., `/sitemaps/clear-bopp-film.xml`).
+
+3.  **Submit the Correct URL to Google:**
+    * Go to **Google Search Console**.
+    * If you already submitted the old sitemap, remove it.
+    * In the "Sitemaps" section, submit your **new sitemap index URL**:
+      `sitemap.xml`
+    * Click **"Submit"**.
+
+
+
+Google will now fetch your main `sitemap.xml` file, see the list of your other sitemaps, and then crawl each of those smaller, faster files without timing out. This will solve the "Couldn't fetch" error for good.
