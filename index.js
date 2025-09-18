@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
+const { SitemapStream } = require('sitemap');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -10,7 +11,6 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static('public'));
 
-// --- Mongoose Connection ---
 const uri = process.env.MONGO_URI;
 mongoose.connect(uri)
     .then(() => console.log("Connected successfully to MongoDB using Mongoose"))
@@ -19,7 +19,6 @@ mongoose.connect(uri)
         process.exit(1);
     });
 
-// --- Mongoose Schemas and Models ---
 const productSchema = new mongoose.Schema({
     name: String,
     slug: String,
@@ -36,12 +35,10 @@ const locationSchema = new mongoose.Schema({
 const Product = mongoose.model('Product', productSchema, 'products');
 const Location = mongoose.model('Location', locationSchema, 'locations');
 
-// --- Homepage Route ---
 app.get('/', (req, res) => {
     res.render('index');
 });
 
-// --- Dynamic Product Route ---
 app.get('/products/:productSlug/:citySlug', async (req, res) => {
     try {
         const { productSlug, citySlug } = req.params;
@@ -61,5 +58,28 @@ app.get('/products/:productSlug/:citySlug', async (req, res) => {
     }
 });
 
-// --- Export the app for Vercel (This replaces app.listen) ---
+app.get('/sitemap.xml', async (req, res) => {
+    res.header('Content-Type', 'application/xml');
+    try {
+        const smStream = new SitemapStream({ hostname: 'https://cities.janvipackaging.online' });
+        smStream.pipe(res);
+        smStream.write({ url: '/', changefreq: 'daily', priority: 1.0 });
+        const products = await Product.find({});
+        const locations = await Location.find({});
+        for (const product of products) {
+            for (const location of locations) {
+                smStream.write({
+                    url: `/products/${product.slug}/${location.slug}`,
+                    changefreq: 'weekly',
+                    priority: 0.8
+                });
+            }
+        }
+        smStream.end();
+    } catch (error) {
+        console.error("Sitemap generation error:", error);
+        res.status(500).end();
+    }
+});
+
 module.exports = app;
