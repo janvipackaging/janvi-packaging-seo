@@ -2,14 +2,12 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
-// The sitemap package is no longer needed in this file
+const { SitemapStream } = require('sitemap');
 
 const app = express();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
-// This line is now very important. It will automatically serve your 
-// new sitemap.xml file because it will be in the 'public' folder.
-app.use(express.static('public')); 
+app.use(express.static('public'));
 
 // --- Mongoose Connection ---
 const uri = process.env.MONGO_URI;
@@ -43,10 +41,44 @@ app.get('/products/:productSlug/:citySlug', async (req, res) => {
     }
 });
 
-// --- NO SITEMAP ROUTES ARE NEEDED HERE ANYMORE ---
-// They were removed because the sitemap is now a static file
-// created during the build process.
+// --- ROUTE 1: The Sitemap Index File ---
+app.get('/sitemap.xml', async (req, res) => {
+    res.header('Content-Type', 'application/xml');
+    try {
+        const smStream = new SitemapStream({ hostname: 'https://cities.janvipackaging.online' });
+        smStream.pipe(res);
+        const products = await Product.find({});
+        products.forEach(product => {
+            smStream.write({ url: `/sitemaps/${product.slug}.xml` });
+        });
+        smStream.end();
+    } catch (error) {
+        console.error("Sitemap index error:", error);
+        res.status(500).end();
+    }
+});
+
+// --- ROUTE 2: Dynamic Sitemaps for Each Product ---
+app.get('/sitemaps/:productSlug.xml', async (req, res) => {
+    res.header('Content-Type', 'application/xml');
+    const { productSlug } = req.params;
+    try {
+        const smStream = new SitemapStream({ hostname: 'https://cities.janvipackaging.online' });
+        smStream.pipe(res);
+        const locations = await Location.find({});
+        locations.forEach(location => {
+            smStream.write({
+                url: `/products/${productSlug}/${location.slug}`,
+                changefreq: 'weekly',
+                priority: 0.8
+            });
+        });
+        smStream.end();
+    } catch (error) {
+        console.error(`Error generating sitemap for ${productSlug}:`, error);
+        res.status(500).end();
+    }
+});
 
 // --- Export the app for Vercel ---
 module.exports = app;
-
